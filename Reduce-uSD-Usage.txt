@@ -1,0 +1,18 @@
+#from:
+https://www.dzombak.com/blog/2023/12/Stop-using-the-Raspberry-Pi-s-SD-card-for-swap.html
+
+#turn off swap 
+sudo dphys-swapfile swapoff
+sudo dphys-swapfile uninstall
+sudo update-rc.d dphys-swapfile remove
+
+# add noswap to boot
+nano /boot/firmwarecmdline.txt. 
+
+add noswap
+
+#made /tmp and /var/log RAM disks
+tmpfs                 /tmp            tmpfs   defaults,noatime,nosuid,nodev  0       0
+tmpfs                 /var/log        tmpfs   defaults,noatime,nosuid,nodev  0       0
+
+
