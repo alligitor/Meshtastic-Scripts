@@ -7,6 +7,39 @@ from pubsub import pub
 
 seperator="\n ---------------\n"
 
+#common messages people send to test their connection
+connection_test_requests = ["test", "radio check", "antenna check"]
+
+def TrimDecodedMessage(user_input):
+
+    print(f"user_input before: -->{user_input}<--")
+
+    #replace a bunch of characters to old school
+    #so splotch plus can handle it
+    #there might be other stuff here that needs to be replaced
+    user_input = user_input.replace('’', "'").replace('‘', "'")
+    user_input = user_input.replace('“', '"').replace('”', '"')
+    
+
+    #user_input = user_input.decode("utf-8")
+    #print(f"user_input after decoding: -->{user_input}<--")
+
+    #user input is comming in decode, so won't have b'   and '
+    #remove the first two characters
+    #user_input = user_input[2:]
+
+    #remove any white space on left side
+    user_input = user_input.lstrip()
+    print(f"user_input after left trim: -->{user_input}<--")
+
+    # remove the last character
+    #user_input = user_input[:-1]
+    #remove any white space on right side
+    user_input = user_input.rstrip()
+    print(f"user_input after right trim: -->{user_input}<--")
+
+    return (user_input)
+
 
 def SplotchPlusSendMessage(user_input):
     # Start a subprocess to run the Python interactive input() function
@@ -21,22 +54,11 @@ def SplotchPlusSendMessage(user_input):
     print(f"Waiting 1 second for splotchPlus to start up")
     time.sleep(1)
 
-    print(f"user_input before any trim: {user_input}")
-
-    #remove the first two characters
-    user_input = user_input[2:]
-    print(f"user_input after left trim: {user_input}")
-    # remove the last character
-    user_input = user_input[:-1]
-    print(f"user_input after right trim: {user_input}")
-    #user_input = "i like x"
-
-    #now limit the string to 50 charactors.  Not sure what SplotchPlus can do with more anyways
+    #for dealing with splotch limit the string to 50 charactors.  Not sure what SplotchPlus can do with more anyways
     user_input = user_input[:50]
 
     #convert to lower case since splotch is case sensative
     user_input = user_input.lower()
-
 
     # make sure there is only one string in there with a \n
     # if there are no \n, append one
@@ -97,38 +119,76 @@ def messageReplyTo(interface, message):
     sender = message["fromId"]
     destination = message["toId"]
 
-    message_payload = str(message["decoded"]["payload"])
+    #use the trim function to remove extra characters resulging from it being a binary coded string
+    message_payload = TrimDecodedMessage(str(message["decoded"]["payload"].decode("UTF-8")))
 
     print(f"Recevied message from: {sender} to: {destination}")
 
-    reply = "Ignore Please"
-    reply = reply + "\nYour message:" + message_payload[:10] + "..."
-    if "pkiEncrypted" in message:
-        reply = reply + "\npkiEncrypted:" + str(message["pkiEncrypted"])
-    if "wantAck" in message:
-        reply = reply + "\nwantAck:" + str(message["wantAck"])
-    if "rxSnr" in message:
-        reply = reply + "\nrxSnr:" + str(message["rxSnr"])
-    if "rxRssi" in message:
-        reply = reply + "\nrxRssi:" + str(message["rxRssi"])
-    if "hopLimit" in message:
-        reply = reply + "\nhopLimit:" + str(message["hopLimit"])
-    if "hopStart" in message:
-        reply = reply + "\nhopStart:" + str(message["hopStart"])
+    send_reply = False
 
-    if sender in knownNodes:
-        reply = SplotchPlusSendMessage(message_payload)
-        print(f"Sending reply back to {sender}")
-        interface.sendText(reply, sender)
+    #generic creator of replies for messages
+    if (message_payload.lower() in connection_test_requests):
+        #someone reqeusted a test
+        reply = "@" + sender + "\nRXed your message"
+        if "pkiEncrypted" in message:
+            reply = reply + "\npkiEncrypted:" + str(message["pkiEncrypted"])
+        if "wantAck" in message:
+            reply = reply + "\nwantAck:" + str(message["wantAck"])
+        if "rxSnr" in message:
+            reply = reply + "\nrxSnr:" + str(message["rxSnr"])
+        if "rxRssi" in message:
+            reply = reply + "\nrxRssi:" + str(message["rxRssi"])
+        if "hopLimit" in message:
+            reply = reply + "\nhopLimit:" + str(message["hopLimit"])
+        if "hopStart" in message:
+            reply = reply + "\nhopStart:" + str(message["hopStart"])
+    elif (message_payload.lower() == "help"):
+        reply = "@" + sender + "\navailable commands"
+        reply = reply + "\nhelp"
+        reply = reply + "\ntest"
+        reply = reply + "\necho"
+        reply = reply + "\ndistance"
+    elif (message_payload.lower() == "echo"):
+        #someone reqeusted a echo
+        reply = "@" + sender + "\nRXed your message"
+        reply = reply + "\nYour message:" + message_payload
+    elif (message_payload.lower() == "distance"):
+        #someone reqeusted a distance calculation
+        reply = "@" + sender + "\ndistance not implemented"
     else:
-        if destination != "^all":
-            #message was to us directly
-            print(f"DM message. Not sending reply back to {sender}")
-        else:
-            #messae was sent to all
-            print(f"Broadcast message. Not sending reply back to {sender}")
-#           interface.sendText(reply, sender)
+        #pass to SplotchPlus
+        reply = SplotchPlusSendMessage(message_payload)
+ 
+    print("---->")
+    print(f"Sender: {sender}\nDestination: {destination}\nMessage: {message_payload}\nReply: {reply}")
+    print("<----")
 
+    if destination == "^all":
+        # message was broadcast to all
+        if sender in knownNodes:
+            print(f"B/C Message from known node {sender}.")
+            send_reply = True
+        else:
+            print(f"B/C Message from unknown node {sender}")
+            #send_reply = True
+    else:
+        #message was to us directly
+        if sender in knownNodes:
+            print(f"D/M Message from known node {sender}.")
+            send_reply = True
+            destination = sender
+        else:
+            print(f"D/M Message from unknown node {sender}")
+#           send_reply = True
+
+    if send_reply == True:
+        print(f"Sending message to {destination}")
+        if destination == "^all":
+            interface.sendText(reply)
+        else:
+            interface.sendText(reply, destination)
+    else:
+        print(f"Not Sending message to {destination}")
 
 def onReceive(packet, interface): # called when a packet arrives
     print(f"{seperator}Received packet: {packet}")
