@@ -8,7 +8,7 @@ from pubsub import pub
 seperator="\n ---------------\n"
 
 #common messages people send to test their connection
-connection_test_requests = ["test", "radio check", "antenna check"]
+connection_test_requests = ["testing", "test", "radio check", "antenna check"]
 
 def TrimDecodedMessage(user_input):
 
@@ -51,8 +51,8 @@ def SplotchPlusSendMessage(user_input):
         text=True  # Work with strings (not bytes)
     )
 
-    print(f"Waiting 1 second for splotchPlus to start up")
-    time.sleep(1)
+    #print(f"Waiting 1 second for splotchPlus to start up")
+    #time.sleep(1)
 
     #for dealing with splotch limit the string to 50 charactors.  Not sure what SplotchPlus can do with more anyways
     user_input = user_input[:50]
@@ -125,11 +125,13 @@ def messageReplyTo(interface, message):
     print(f"Recevied message from: {sender} to: {destination}")
 
     send_reply = False
+    message_type = "none"
 
     #generic creator of replies for messages
     if (message_payload.lower() in connection_test_requests):
         #someone reqeusted a test
-        reply = "@" + sender + "\nRXed your message"
+        reply = "@" + sender
+        reply = reply + "\nAck from SW 01803"
         if "pkiEncrypted" in message:
             reply = reply + "\npkiEncrypted:" + str(message["pkiEncrypted"])
         if "wantAck" in message:
@@ -142,22 +144,27 @@ def messageReplyTo(interface, message):
             reply = reply + "\nhopLimit:" + str(message["hopLimit"])
         if "hopStart" in message:
             reply = reply + "\nhopStart:" + str(message["hopStart"])
+        message_type = "connection_test"
     elif (message_payload.lower() == "help"):
         reply = "@" + sender + "\navailable commands"
         reply = reply + "\nhelp"
         reply = reply + "\ntest"
         reply = reply + "\necho"
         reply = reply + "\ndistance"
+        message_type = "help"
     elif (message_payload.lower() == "echo"):
         #someone reqeusted a echo
         reply = "@" + sender + "\nRXed your message"
         reply = reply + "\nYour message:" + message_payload
+        message_type = "echo"
     elif (message_payload.lower() == "distance"):
         #someone reqeusted a distance calculation
         reply = "@" + sender + "\ndistance not implemented"
+        message_type = "distance"
     else:
         #pass to SplotchPlus
         reply = SplotchPlusSendMessage(message_payload)
+        message_type = "splotchplus"
  
     print("---->")
     print(f"Sender: {sender}\nDestination: {destination}\nMessage: {message_payload}\nReply: {reply}")
@@ -167,10 +174,13 @@ def messageReplyTo(interface, message):
         # message was broadcast to all
         if sender in knownNodes:
             print(f"B/C Message from known node {sender}.")
-            send_reply = True
+            if message_type in ["connection_test", "help", "echo"]:
+                send_reply = True
         else:
             print(f"B/C Message from unknown node {sender}")
-            #send_reply = True
+            #in public channel limit replies to a few things such as connection_test, help, echo
+            if message_type in ["connection_test", "help", "echo"]:
+                send_reply = True
     else:
         #message was to us directly
         if sender in knownNodes:
@@ -179,7 +189,8 @@ def messageReplyTo(interface, message):
             destination = sender
         else:
             print(f"D/M Message from unknown node {sender}")
-#           send_reply = True
+            send_reply = True
+            destination = sender
 
     if send_reply == True:
         print(f"Sending message to {destination}")
