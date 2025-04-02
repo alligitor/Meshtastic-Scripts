@@ -3,12 +3,42 @@ import meshtastic
 import meshtastic.tcp_interface
 import subprocess
 import time
+import math
 from pubsub import pub
+
+#global variables
+
+# dictionary for holding all the nodes we get via onNodeUpdated
+dictAllNodes = {}
 
 seperator="\n ---------------\n"
 
 #common messages people send to test their connection
 connection_test_requests = ["testing", "test", "radio check", "antenna check"]
+
+# Function to calculate distance between two GPS points using the Haversine formula
+def haversine(lat1, lon1, lat2, lon2):
+    # Radius of Earth in kilometers (use 3958.8 for miles)
+    R = 6371.0
+    
+    # Convert latitude and longitude from degrees to radians
+    lat1_rad = math.radians(lat1)
+    lon1_rad = math.radians(lon1)
+    lat2_rad = math.radians(lat2)
+    lon2_rad = math.radians(lon2)
+    
+    # Differences in coordinates
+    dlat = lat2_rad - lat1_rad
+    dlon = lon2_rad - lon1_rad
+    
+    # Haversine formula
+    a = math.sin(dlat / 2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    
+    # Calculate the distance
+    distance = R * c
+    
+    return distance
 
 def TrimDecodedMessage(user_input):
 
@@ -115,9 +145,45 @@ def read_file_to_array(file_path):
         print(f"An error occurred: {e}")
         return []
 
+def getNodeInfo(interface, target_node_id):
+
+    #default return value
+    returnedNode = None
+    
+    #for node in interface.nodes: #.values():  # Access nodes from the interface
+        #print(f"Node Information -->{node}<--")
+
+        # if node.id == target_node_id:
+        #     print(f"Node Found: {node.id}")
+        #     print(f"Node Name: {node.get('name', 'Unnamed')}")
+        #     print(f"Node Lat: {node.get('lat', 'N/A')}")
+        #     print(f"Node Lon: {node.get('lon', 'N/A')}")
+        #     print(f"Node Last Seen: {node.get('lastHeard', 'N/A')}")
+        #     returnedNode = node
+        #     break
+
+    return returnedNode
+
 def messageReplyTo(interface, message):
     sender = message["fromId"]
     destination = message["toId"]
+
+
+    #print my node information to see what it looks like
+    myNodeInfo = interface.getMyNodeInfo()
+    #print(f"My Node Info: {myNodeInfo}")
+
+
+    # if sender in dictAllNodes:
+    #     print(f"Node {sender}")
+    #     print(f"    num: {dictAllNodes[sender]['num']}")
+    #     print(f"    short name: {dictAllNodes[sender]['user']['shortName']}")
+
+
+    #dig up the node info from the interface object
+    senderNode = getNodeInfo(interface, sender)
+    #if (senderNode != None):
+    #    print({senderNode})
 
     #use the trim function to remove extra characters resulging from it being a binary coded string
     message_payload = TrimDecodedMessage(str(message["decoded"]["payload"].decode("UTF-8")))
@@ -140,16 +206,18 @@ def messageReplyTo(interface, message):
             reply = reply + "\nrxSnr:" + str(message["rxSnr"])
         if "rxRssi" in message:
             reply = reply + "\nrxRssi:" + str(message["rxRssi"])
-        if "hopLimit" in message:
+        if "hopLimit" in message and "hopStart" in message:
             reply = reply + "\nhopLimit:" + str(message["hopLimit"])
-        if "hopStart" in message:
             reply = reply + "\nhopStart:" + str(message["hopStart"])
+            hopCount = message["hopStart"] - message["hopLimit"]
+            reply = reply + "\nHops:" + str(hopCount)
         message_type = "connection_test"
     elif (message_payload.lower() == "help"):
         reply = "@" + sender + "\navailable commands"
         reply = reply + "\nhelp"
         reply = reply + "\ntest"
         reply = reply + "\necho"
+        reply = reply + "\nping"
         reply = reply + "\ndistance"
         message_type = "help"
     elif (message_payload.lower() == "echo"):
@@ -159,8 +227,29 @@ def messageReplyTo(interface, message):
         message_type = "echo"
     elif (message_payload.lower() == "distance"):
         #someone reqeusted a distance calculation
-        reply = "@" + sender + "\ndistance not implemented"
+        if sender in dictAllNodes:
+            if "position" in dictAllNodes[sender]:
+                senderLatitude  = dictAllNodes[sender]["position"]["latitude"]
+                senderLongitute = dictAllNodes[sender]["position"]["longitude"]
+
+                myNodeInfo = interface.getMyNodeInfo()
+                myLatitude  = myNodeInfo["position"]["latitude"]
+                myLongitute = myNodeInfo["position"]["longitude"]
+
+                # print(f"My     Position: {myLatitude}, {myLongitute}")
+                # print(f"Sender Position: {senderLatitude}, {senderLongitute}")
+                distance = haversine(senderLatitude, senderLongitute, myLatitude, myLongitute)
+                reply = "@" + sender + f"\nWe are {distance} km apart"
+            else:
+                reply = "@" + sender + "\nyou don't have position info"
+        else:
+            reply = "@" + sender + "\nSorry, don't know about your node"    
+
         message_type = "distance"
+    elif (message_payload.lower() == "ping"):
+        #someone reqeusted a distance calculation
+        reply = "@" + sender + "\npong"
+        message_type = "ping"
     else:
         #pass to SplotchPlus
         reply = SplotchPlusSendMessage(message_payload)
@@ -174,12 +263,12 @@ def messageReplyTo(interface, message):
         # message was broadcast to all
         if sender in knownNodes:
             print(f"B/C Message from known node {sender}.")
-            if message_type in ["connection_test", "help", "echo"]:
+            if message_type in ["connection_test", "help", "echo", "ping"]:
                 send_reply = True
         else:
             print(f"B/C Message from unknown node {sender}")
             #in public channel limit replies to a few things such as connection_test, help, echo
-            if message_type in ["connection_test", "help", "echo"]:
+            if message_type in ["connection_test", "help", "echo", "ping"]:
                 send_reply = True
     else:
         #message was to us directly
@@ -216,12 +305,14 @@ def onConnection(interface, topic=pub.AUTO_TOPIC): # called when we (re)connect 
                 break
 
 def onNodeUpdated(node, interface):
-#def onNodeUpdated(node, interface):
     print(f"{seperator}Node updated")
     print(f"{node}")
     print(f'User ID = {node["user"]["id"]}')
 
-   # if it's one of the known nodes, send it a message
+    #add to global node dictionary
+    dictAllNodes.update( {node["user"]["id"] : node})
+
+    # if it's one of the known nodes, send it a message
     if node["user"]["id"] in knownNodes:
         print(f'Sending direct message to {node["user"]["id"]}')
         interface.sendText("Test - found my own node!!!", node["user"]["id"])
