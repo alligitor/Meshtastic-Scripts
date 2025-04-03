@@ -42,7 +42,7 @@ def haversine(lat1, lon1, lat2, lon2):
 
 def TrimDecodedMessage(user_input):
 
-    print(f"user_input before: -->{user_input}<--")
+    #print(f"user_input before: -->{user_input}<--")
 
     #replace a bunch of characters to old school
     #so splotch plus can handle it
@@ -50,7 +50,6 @@ def TrimDecodedMessage(user_input):
     user_input = user_input.replace('’', "'").replace('‘', "'")
     user_input = user_input.replace('“', '"').replace('”', '"')
     
-
     #user_input = user_input.decode("utf-8")
     #print(f"user_input after decoding: -->{user_input}<--")
 
@@ -60,16 +59,15 @@ def TrimDecodedMessage(user_input):
 
     #remove any white space on left side
     user_input = user_input.lstrip()
-    print(f"user_input after left trim: -->{user_input}<--")
+    #print(f"user_input after left trim: -->{user_input}<--")
 
     # remove the last character
     #user_input = user_input[:-1]
     #remove any white space on right side
     user_input = user_input.rstrip()
-    print(f"user_input after right trim: -->{user_input}<--")
+    #print(f"user_input after right trim: -->{user_input}<--")
 
     return (user_input)
-
 
 def SplotchPlusSendMessage(user_input):
     # Start a subprocess to run the Python interactive input() function
@@ -127,8 +125,6 @@ def SplotchPlusSendMessage(user_input):
 
     return stdout
 
-
-
 # Function to read the file and store each line in an array
 def read_file_to_array(file_path):
     lines = []  # Initialize an empty list
@@ -167,7 +163,6 @@ def getNodeInfo(interface, target_node_id):
 def messageReplyTo(interface, message):
     sender = message["fromId"]
     destination = message["toId"]
-
 
     #print my node information to see what it looks like
     myNodeInfo = interface.getMyNodeInfo()
@@ -256,7 +251,8 @@ def messageReplyTo(interface, message):
         message_type = "splotchplus"
  
     print("---->")
-    print(f"Sender: {sender}\nDestination: {destination}\nMessage: {message_payload}\nReply: {reply}")
+    print(f"Sender: {sender} to Destination: {destination}")
+    print(f"\nInitial: {message_payload}\nReply: {reply}")
     print("<----")
 
     if destination == "^all":
@@ -291,7 +287,9 @@ def messageReplyTo(interface, message):
         print(f"Not Sending message to {destination}")
 
 def onReceive(packet, interface): # called when a packet arrives
-    print(f"{seperator}Received packet: {packet}")
+    #print(f"{seperator}Received packet: {packet}")
+    # don't do anything on packet reception
+    return
 
 def onConnection(interface, topic=pub.AUTO_TOPIC): # called when we (re)connect to the radio
     # defaults to broadcast, specify a destination ID if you wish
@@ -301,7 +299,8 @@ def onConnection(interface, topic=pub.AUTO_TOPIC): # called when we (re)connect 
     if interface.nodes:
         for n in interface.nodes.values():
             if n["num"] == interface.myInfo.my_node_num:
-                print(n["user"]["hwModel"])
+                print("My node ID: " + n["user"]["id"])
+                print(f"{seperator}")
                 break
 
 def onNodeUpdated(node, interface):
@@ -317,9 +316,8 @@ def onNodeUpdated(node, interface):
         print(f'Sending direct message to {node["user"]["id"]}')
         interface.sendText("Test - found my own node!!!", node["user"]["id"])
 
-
 def onReceiveText(packet, interface):
-    print(f"{seperator}Received Text: {packet}")
+    #print(f"{seperator}Received Text: {packet}")
     messageReplyTo(interface, packet)
 
 
