@@ -96,14 +96,14 @@ def SplotchPlusSendMessage(user_input):
 
     # Extract the substring up to the first newline (if newline exists)
     if position_of_newline != -1:
-        extracted_string = user_input[:position+1]
+        extracted_string = user_input[:position_of_newline+1]
         print(f"Extracted string up to the first '\\n': {extracted_string}")
     else:
         print("No newline character '\\n' found in the string, adding one")
         user_input = user_input + "\n"
 
 
-    print(f"Writing message to SplotchPlus {user_input}")
+    print(f"Writing message to SplotchPlus -->{user_input}<--")
     process.stdin.write(user_input)
     process.stdin.flush()
     process.stdin.write(user_input)
@@ -318,6 +318,8 @@ def onNodeUpdated(node, interface):
 
 def onReceiveText(packet, interface):
     #print(f"{seperator}Received Text: {packet}")
+    #put a marker here so it's easier for us to see when a new text packet has come in
+    print(">------------------------------------<")
     messageReplyTo(interface, packet)
 
 
