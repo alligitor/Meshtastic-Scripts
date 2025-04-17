@@ -3,4 +3,5 @@
 source ~/meshtastic/bin/activate
 # make sure we are in the correct directory
 cd /home/pi/Meshtastic-Scripts
-/usr/bin/screen -S splotchplus -d -m /home/pi/meshtastic/bin/python3 BasicConnection.py
+/usr/bin/screen -S splotchplus -d -m /home/pi/meshtastic/bin/python3 BotTastic.py
+
