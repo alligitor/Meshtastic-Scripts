@@ -20,6 +20,16 @@ seperator="\n ---------------\n"
 #common messages people send to test their connection
 connection_test_requests = ["testing", "test", "radio check", "antenna check"]
 
+#function to save a string to a file. 
+def logMessageToFile(file_name, text_to_append):
+    try:
+        with open(file_name, 'a') as file:
+            file.write(text_to_append + '\n')
+    except Exception as e:
+	#ignore errors
+        None
+
+
 # routine to see if a socket is open or close
 def isSocketConnected(sock):
     r, _, _ = select.select([sock], [], [], 0)
@@ -275,20 +285,22 @@ def messageReplyTo(interface, message):
         reply = SplotchPlusSendMessage(message_payload)
         message_type = "splotchplus"
  
-    print("---->")
-    print(f"Sender: {sender} to Destination: {destination}")
-    print(f"\nInitial: {message_payload}\nReply: {reply}")
+    #build a string of the message and reply to log
+    conversation_log = ""
+    conversation_log += "---->\n"
+    conversation_log += f"Sender: {sender} to Destination: {destination}\n"
+    conversation_log += f"\nInitial: {message_payload}\nReply: {reply}\n"
 
     if destination == "^all":
         # message was broadcast to all
         knownNode = findKnownNode(sender)
 
         if knownNode != None:
-            print(f"B/C Message from known node {sender}.")
+            conversation_log += f"B/C Message from known node {sender}.\n"
             if message_type in ["connection_test", "help", "echo", "ping"]:
                 send_reply = True
         else:
-            print(f"B/C Message from unknown node {sender}")
+            conversation_log += f"B/C Message from unknown node {sender}\n"
             #in public channel limit replies to a few things such as connection_test, help, echo
             if message_type in ["connection_test", "help", "echo", "ping"]:
                 send_reply = True
@@ -296,25 +308,30 @@ def messageReplyTo(interface, message):
         #message was to us directly
         knownNode = findKnownNode(sender)
         if knownNode != None:
-            print(f"D/M Message from known node {sender}.")
+            conversation_log += f"D/M Message from known node {sender}.\n"
             send_reply = True
             destination = sender
         else:
-            print(f"D/M Message from unknown node {sender}")
+            conversation_log += f"D/M Message from unknown node {sender}\n"
             send_reply = True
             destination = sender
 
     if send_reply == True:
-        print(f"Sending message to {destination}")
+        conversation_log += f"Sending message to {destination}\n"
         if destination == "^all":
             interface.sendText(reply)
         else:
             interface.sendText(reply, destination)
     else:
-        print(f"Not Sending message to {destination}")
+        conversation_log += f"Not Sending message to {destination}\n"
 
     #final marker for current message that was processed
-    print("<----")
+    conversation_log += "<----\n"
+
+    # print the mssage to screen and also log it
+    print(conversation_log)
+    logMessageToFile("/tmp/splotchplus_msg_log.txt", conversation_log)
+
 
 def onReceive(packet, interface): # called when a packet arrives
     #print(f"{seperator}Received packet: {packet}")
