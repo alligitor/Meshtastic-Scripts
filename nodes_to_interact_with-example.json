@@ -1,0 +1,5 @@
+[
+    {"Id": "!aabbccdd", "action": "Message", "message": "Hello aabbccdd"},
+    {"Id": "!bbccddee", "action": "Message", "message": "Hello bbccddee"},
+    {"Id": "!ccddeeff", "action": "Message", "message": "Bye ccddeeff"}
+]
