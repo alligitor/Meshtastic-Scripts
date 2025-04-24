@@ -215,8 +215,13 @@ def messageReplyTo(interface, message):
     #if (senderNode != None):
     #    print({senderNode})
 
-    #use the trim function to remove extra characters resulging from it being a binary coded string
-    message_payload = TrimDecodedMessage(str(message["decoded"]["payload"].decode("UTF-8")))
+    #use the trim function to remove extra characters resulting from it being a binary coded string
+    try:
+        #sometimes decode fails
+        message_payload = TrimDecodedMessage(str(message["decoded"]["payload"].decode("UTF-8")))
+    except:
+        print(f"Message causing decode exception: {str(message['decoded']['payload'])}")
+        message_payload = TrimDecodedMessage(str(message["decoded"]["payload"]))
 
     #print(f"Recevied message from: {sender} to: {destination}")
 
