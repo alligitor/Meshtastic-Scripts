@@ -255,10 +255,10 @@ def messageReplyTo(interface, message):
         reply = reply + "\nping"
         reply = reply + "\ndistance"
         message_type = "help"
-    elif (message_payload.lower() == "echo"):
+    elif (message_payload.lower()[:len("echo")] == "echo"):
         #someone reqeusted a echo
-        reply = "@" + sender + "\nRXed your message"
-        reply = reply + "\nYour message:" + message_payload
+        reply = "@" + sender
+        reply = reply + "\n" + message_payload
         message_type = "echo"
     elif (message_payload.lower() == "distance"):
         #someone reqeusted a distance calculation
