@@ -210,6 +210,24 @@ def messageReplyTo(interface, message):
     #print my node information to see what it looks like
     myNodeInfo = interface.getMyNodeInfo()
 
+    myNodeId = myNodeInfo['user']['id']
+    if (myNodeId.startswith("!")):
+        # remove the !
+        myNodeId = myNodeId[1:]
+    #at this point, myNodeId hould have 8 characters.  double check
+    if (len(myNodeId) != 8):
+        #set it to some junk if not equal to 8
+        myNodeId = "xxxxyyyy"
+
+    #create a bunch of aliases that I would assume is me
+    myNodeAliases = []
+    myNodeAliases.append(myNodeId[-4:]) #last 4 of the id
+    myNodeAliases.append("@" + myNodeId[-4:]) #last 4 of the id, starting with @
+    myNodeAliases.append(myNodeId) #all 8 digits
+    myNodeAliases.append("@" + myNodeId) # @ followed by all 8 digits
+
+
+
     #dig up the node info from the interface object
     senderNode = getNodeInfo(interface, sender)
     #if (senderNode != None):
@@ -231,24 +249,23 @@ def messageReplyTo(interface, message):
     #generic creator of replies for messages
     if (message_payload.lower() in connection_test_requests):
         #someone reqeusted a test
-        reply = "@" + sender
-        reply = reply + "\nAck from SW 01803"
+        reply = reply + "Ack from SW 01803"
         if "pkiEncrypted" in message:
             reply = reply + "\npkiEncrypted:" + str(message["pkiEncrypted"])
         if "wantAck" in message:
-            reply = reply + "\nwantAck:" + str(message["wantAck"])
+            reply = reply + "wantAck:" + str(message["wantAck"])
         if "rxSnr" in message:
-            reply = reply + "\nrxSnr:" + str(message["rxSnr"])
+            reply = reply + "rxSnr:" + str(message["rxSnr"])
         if "rxRssi" in message:
-            reply = reply + "\nrxRssi:" + str(message["rxRssi"])
+            reply = reply + "rxRssi:" + str(message["rxRssi"])
         if "hopLimit" in message and "hopStart" in message:
-            reply = reply + "\nhopLimit:" + str(message["hopLimit"])
+            reply = reply + "hopLimit:" + str(message["hopLimit"])
             reply = reply + "\nhopStart:" + str(message["hopStart"])
             hopCount = message["hopStart"] - message["hopLimit"]
             reply = reply + "\nHops:" + str(hopCount)
         message_type = "connection_test"
     elif (message_payload.lower() == "help"):
-        reply = "@" + sender + "\navailable commands"
+        reply = "available commands"
         reply = reply + "\nhelp"
         reply = reply + "\ntest"
         reply = reply + "\necho"
@@ -257,8 +274,7 @@ def messageReplyTo(interface, message):
         message_type = "help"
     elif (message_payload.lower()[:len("echo")] == "echo"):
         #someone reqeusted a echo
-        reply = "@" + sender
-        reply = reply + "\n" + message_payload
+        reply = reply + message_payload
         message_type = "echo"
     elif (message_payload.lower() == "distance"):
         #someone reqeusted a distance calculation
@@ -274,27 +290,37 @@ def messageReplyTo(interface, message):
                 # print(f"My     Position: {myLatitude}, {myLongitute}")
                 # print(f"Sender Position: {senderLatitude}, {senderLongitute}")
                 distance = haversine(senderLatitude, senderLongitute, myLatitude, myLongitute)
-                reply = "@" + sender + f"\nWe are {distance} km apart"
+                reply = f"We are {distance} km apart"
             else:
-                reply = "@" + sender + "\nyou don't have position info"
+                reply = "you don't have position info"
         else:
-            reply = "@" + sender + "\nSorry, don't know about your node"
+            reply = "Sorry, don't know about your node"
 
         message_type = "distance"
-    elif (message_payload.lower() == "ping"):
+    elif (message_payload.lower()[:len("ping")] == "ping"):
         #someone reqeusted a distance calculation
-        reply = "@" + sender + "\npong"
+        reply = "pong"
         message_type = "ping"
     else:
+        #check to see if the begining of the message was an indication it was destined to us directly
+        #people use this in the public channel
+        for alias in myNodeAliases:
+           if (message_payload.lower()[:len(alias)] == alias):
+               #remove the alias from begining of the message
+               message_payload = message_payload[len(alias):]
+               message_type = "splotchplus_directed"
+
         #pass to SplotchPlus
         reply = SplotchPlusSendMessage(message_payload)
-        message_type = "splotchplus"
- 
-    #build a string of the message and reply to log
+
+        if (message_type != "splotchplus_directed"):
+            message_type = "splotchplus"
+
+    #create the message that goes to the console about the message
     conversation_log = ""
     conversation_log += "---->\n"
-    conversation_log += f"Sender: {sender} to Destination: {destination}\n"
-    conversation_log += f"\nInitial: {message_payload}\nReply: {reply}\n"
+    #the following code modifies destination, keep a copy of the original one
+    original_destination = destination
 
     if destination == "^all":
         # message was broadcast to all
@@ -302,12 +328,12 @@ def messageReplyTo(interface, message):
 
         if knownNode != None:
             conversation_log += f"B/C Message from known node {sender}.\n"
-            if message_type in ["connection_test", "help", "echo", "ping"]:
+            if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed"]:
                 send_reply = True
         else:
             conversation_log += f"B/C Message from unknown node {sender}\n"
             #in public channel limit replies to a few things such as connection_test, help, echo
-            if message_type in ["connection_test", "help", "echo", "ping"]:
+            if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed"]:
                 send_reply = True
     else:
         #message was to us directly
@@ -320,6 +346,14 @@ def messageReplyTo(interface, message):
             conversation_log += f"D/M Message from unknown node {sender}\n"
             send_reply = True
             destination = sender
+
+    #prepend @sender to the begining of messages if destination is public channel
+    if (destination == "^all"):
+        reply = "@" + sender + "\n"
+
+    #build a string of the message and reply to log
+    conversation_log += f"       sent to destination: {original_destination}\n"
+    conversation_log += f"\nInitial: {message_payload}\nReply: {reply}\n"
 
     if send_reply == True:
         conversation_log += f"Sending message to {destination}\n"
