@@ -349,7 +349,7 @@ def messageReplyTo(interface, message):
 
     #prepend @sender to the begining of messages if destination is public channel
     if (destination == "^all"):
-        reply = "@" + sender + "\n"
+        reply = "@" + sender + "\n" + reply
 
     #build a string of the message and reply to log
     conversation_log += f"       sent to destination: {original_destination}\n"
