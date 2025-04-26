@@ -249,7 +249,7 @@ def messageReplyTo(interface, message):
     #generic creator of replies for messages
     if (message_payload.lower() in connection_test_requests):
         #someone reqeusted a test
-        reply = reply + "Ack from SW 01803"
+        reply = "Ack from SW 01803"
         if "pkiEncrypted" in message:
             reply = reply + "\npkiEncrypted:" + str(message["pkiEncrypted"])
         if "wantAck" in message:
@@ -274,7 +274,8 @@ def messageReplyTo(interface, message):
         message_type = "help"
     elif (message_payload.lower()[:len("echo")] == "echo"):
         #someone reqeusted a echo
-        reply = reply + message_payload
+        reply = "echoing: "
+        reply = reply + message_payload[len("echo"):]
         message_type = "echo"
     elif (message_payload.lower() == "distance"):
         #someone reqeusted a distance calculation
