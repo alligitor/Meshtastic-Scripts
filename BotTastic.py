@@ -8,6 +8,9 @@ from pubsub import pub
 import json
 import socket
 import select
+from meshtastic.protobuf import mesh_pb2, portnums_pb2, telemetry_pb2
+import random
+import datetime
 
 
 #global variables
@@ -424,6 +427,60 @@ def onReceiveText(packet, interface):
     except:
         exit(0)
 
+def onReceiveDataPort_TELEMETRY_APP(packet):
+    #print(">------------------------------------<")
+    #print(f"    {packet}")
+    result = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    result = result + " - "
+    if packet['decoded']['portnum'] == "TELEMETRY_APP":
+        result += f"Received telementry update from {packet['fromId']}"
+    else:
+        result += f"Received unexpected port {packet['decoded']['portnum']}"
+
+    logMessageToFile("/tmp/telemetry_result.txt", result)
+
+def sendTelementryToRandomNode(interface):
+    # pick another node at random and send a message
+    #print("sendTelementryToRandomNode")
+    try:
+        if interface.nodesByNum is not None:
+            node = interface.nodesByNum.get(interface.localNode.nodeNum)
+            if node is not None:
+                metrics = node.get("deviceMetrics")
+                if metrics:
+                    r = telemetry_pb2.Telemetry()
+
+                    batteryLevel = metrics.get("batteryLevel")
+                    if batteryLevel is not None:
+                        r.device_metrics.battery_level = batteryLevel
+                    if False:
+                        voltage = metrics.get("voltage")
+                        if voltage is not None:
+                            r.device_metrics.voltage = voltage
+                        channel_utilization = metrics.get("channelUtilization")
+                        if channel_utilization is not None:
+                            r.device_metrics.channel_utilization = channel_utilization
+                        air_util_tx = metrics.get("airUtilTx")
+                        if air_util_tx is not None:
+                            r.device_metrics.air_util_tx = air_util_tx
+                        uptime_seconds = metrics.get("uptimeSeconds")
+                        if uptime_seconds is not None:
+                            r.device_metrics.uptime_seconds = uptime_seconds
+     
+                    if len(dictAllNodes) > 0:
+                        dest = random.choice(list(dictAllNodes))
+                        #print(f"Sending Telemetry to {dest}")
+
+                        interface.sendData(r,
+                                    destinationId=dest,
+                                    portNum=portnums_pb2.PortNum.TELEMETRY_APP,
+                                    wantResponse=True,
+                                    onResponse=onReceiveDataPort_TELEMETRY_APP,
+                                    channelIndex=0,
+                                    )
+    except e:
+        print("Error {e}")
+
 
 ############################
 # main code
@@ -448,18 +505,31 @@ pub.subscribe(onConnectionLost, "meshtastic.connection.lost")
 pub.subscribe(onNodeUpdated, "meshtastic.node.updated")
 pub.subscribe(onReceiveText, "meshtastic.receive.text")
 
-
-
 try:
     interface = meshtastic.tcp_interface.TCPInterface(hostname='localhost')
 
+    start_time = time.time()
+    
     while True:
         time.sleep(2)
 
         #keep an eye on the socket to see if it closed
         if isSocketConnected(interface.socket):
             None
-            #print("Socket is connected")
+            #While connected wake up eveyr 5 seconds and do something
+            current_time = time.time()
+            elapsed = current_time - start_time
+
+            #send a message to a random node every 15 seconds
+            #checks to see if any node responds
+            if elapsed >= 15:
+                None
+                if True: #if statement for turning this code on / off
+                    #print(f"{int(elapsed)} seconds have passed.")
+                    start_time = time.time()
+
+                    # pick another node at random and send a message
+                    sendTelementryToRandomNode(interface)
         else:
             print("Socket is disconnected")
             interface.close()
