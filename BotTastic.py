@@ -11,12 +11,18 @@ import select
 from meshtastic.protobuf import mesh_pb2, portnums_pb2, telemetry_pb2
 import random
 import datetime
+import threading
+import base64
 
 
 #global variables
 
 # dictionary for holding all the nodes we get via onNodeUpdated
 dictAllNodes = {}
+dictAllNodesLock = threading.Lock()
+
+#list of known Nodes
+knownNodes = {}
 
 seperator="\n ---------------\n"
 
@@ -32,7 +38,6 @@ def logMessageToFile(file_name, text_to_append):
 	#ignore errors
         None
 
-
 # routine to see if a socket is open or close
 def isSocketConnected(sock):
     r, _, _ = select.select([sock], [], [], 0)
@@ -41,7 +46,6 @@ def isSocketConnected(sock):
         if not data:
             return False
     return True
-
 
 # Function to calculate distance between two GPS points using the Haversine formula
 def haversine(lat1, lon1, lat2, lon2):
@@ -152,6 +156,40 @@ def SplotchPlusSendMessage(user_input):
 
     return stdout
 
+def saveDataToJSONfile(filename, data):
+    #currently, the dump function causes an error
+    #saveDataToJSONfile Type <class 'meshtastic.protobuf.mesh_pb2.MeshPacket'> not serializable
+    #disabling this until we figure it out
+    return
+
+    def default_serializer(obj):
+        if isinstance(obj, bytes):
+            return {'__bytes__': True, 'data': base64.b64encode(obj).decode('utf-8')}
+        raise TypeError(f"Type {type(obj)} not serializable")
+    try:
+        # Save to file
+        with open(filename, 'w') as f:
+            json.dump(data, f, default=default_serializer, indent=2)
+    except Exception as e:
+        print(f"Error in saveDataToJSONfile {e}")
+
+def loadDataFromJSONFile(filename):
+    def object_hook(obj):
+        if '__bytes__' in obj:
+            return base64.b64decode(obj['data'].encode('utf-8'))
+        return obj
+
+    try:
+        with open(filename, 'r') as f:
+            data = json.load(f, object_hook=object_hook)
+            return data
+    except FileNotFoundError:
+        print(f"File {file_path} not found.")
+        return []
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON: {e}")
+        return []
+
 # Function to read the file and store each line in an array
 def read_file_to_array(file_path):
     lines = []  # Initialize an empty list
@@ -166,19 +204,6 @@ def read_file_to_array(file_path):
         return []
     except Exception as e:
         print(f"An error occurred: {e}")
-        return []
-
-# Function to read the json file and store
-def read_json_file(file_path):
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return data
-    except FileNotFoundError:
-        print(f"File {file_path} not found.")
-        return []
-    except json.JSONDecodeError as e:
-        print(f"Error decoding JSON: {e}")
         return []
 
 def findKnownNode(nodeId):
@@ -267,6 +292,12 @@ def messageReplyTo(interface, message):
             hopCount = message["hopStart"] - message["hopLimit"]
             reply = reply + "\nHops:" + str(hopCount)
         message_type = "connection_test"
+    elif (message_payload.lower() == "xxx"):
+        print(f"{dictAllNodes}")
+        reply = "number = " + str(len(dictAllNodes))
+        with dictAllNodesLock:
+            saveDataToJSONfile("/tmp/allNodes.json", dictAllNodes)
+        message_type = "debug"
     elif (message_payload.lower() == "help"):
         reply = "available commands"
         reply = reply + "\nhelp"
@@ -282,23 +313,24 @@ def messageReplyTo(interface, message):
         message_type = "echo"
     elif (message_payload.lower() == "distance"):
         #someone reqeusted a distance calculation
-        if sender in dictAllNodes:
-            if "position" in dictAllNodes[sender]:
-                senderLatitude  = dictAllNodes[sender]["position"]["latitude"]
-                senderLongitute = dictAllNodes[sender]["position"]["longitude"]
+        with dictAllNodesLock:
+            if sender in dictAllNodes:
+                if "position" in dictAllNodes[sender]:
+                    senderLatitude  = dictAllNodes[sender]["position"]["latitude"]
+                    senderLongitute = dictAllNodes[sender]["position"]["longitude"]
 
-                myNodeInfo = interface.getMyNodeInfo()
-                myLatitude  = myNodeInfo["position"]["latitude"]
-                myLongitute = myNodeInfo["position"]["longitude"]
+                    myNodeInfo = interface.getMyNodeInfo()
+                    myLatitude  = myNodeInfo["position"]["latitude"]
+                    myLongitute = myNodeInfo["position"]["longitude"]
 
-                # print(f"My     Position: {myLatitude}, {myLongitute}")
-                # print(f"Sender Position: {senderLatitude}, {senderLongitute}")
-                distance = haversine(senderLatitude, senderLongitute, myLatitude, myLongitute)
-                reply = f"We are {distance} km apart"
+                    # print(f"My     Position: {myLatitude}, {myLongitute}")
+                    # print(f"Sender Position: {senderLatitude}, {senderLongitute}")
+                    distance = haversine(senderLatitude, senderLongitute, myLatitude, myLongitute)
+                    reply = f"We are {distance} km apart"
+                else:
+                    reply = "you don't have position info"
             else:
-                reply = "you don't have position info"
-        else:
-            reply = "Sorry, don't know about your node"
+                reply = "Sorry, don't know about your node"
 
         message_type = "distance"
     elif (message_payload.lower()[:len("ping")] == "ping"):
@@ -375,7 +407,6 @@ def messageReplyTo(interface, message):
     print(conversation_log)
     logMessageToFile("/tmp/splotchplus_msg_log.txt", conversation_log)
 
-
 def onReceive(packet, interface): # called when a packet arrives
     #print(f"{seperator}Received packet: {packet}")
     # don't do anything on packet reception
@@ -396,18 +427,18 @@ def onConnectionEstablished(interface, topic=pub.AUTO_TOPIC): # called when we (
 def onConnectionLost(interface):
     print(f"{seperator}Lost connection to the radio")
 
-
 def onNodeUpdated(node, interface):
     #print(f"{seperator}Node updated")
     #print(f"{node}")
     #print(f'User ID = {node["user"]["id"]}')
 
-    #add to global node dictionary
-    dictAllNodes.update( {node["user"]["id"] : node})
-
-    # if it's one of the known nodes, send it a message
     nodeId = node["user"]["id"]
 
+    #add to global node dictionary
+    with dictAllNodesLock:
+        dictAllNodes.update( {nodeId : node})
+
+    # if it's one of the known nodes, send it a message
     knownNode = findKnownNode(nodeId)
     if (knownNode != None):
         match knownNode.get('action'):
@@ -417,6 +448,12 @@ def onNodeUpdated(node, interface):
             case _:
                 None
 
+    #add a new dictionary to the node for storing my data
+    with dictAllNodesLock:
+        if dictAllNodes[nodeId].get("BotTasticData") ==  None:
+            dictAllNodes[nodeId]["BotTasticData"] = {}
+
+        saveDataToJSONfile("/tmp/allNodes.json", dictAllNodes)
 
 def onReceiveText(packet, interface):
     #print(f"{seperator}Received Text: {packet}")
@@ -430,14 +467,26 @@ def onReceiveText(packet, interface):
 def onReceiveDataPort_TELEMETRY_APP(packet):
     #print(">------------------------------------<")
     #print(f"    {packet}")
-    result = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    fromNode = packet['fromId']
+    timeStamp = datetime.datetime.now()
+
+    result = timeStamp.strftime("%Y-%m-%d %H:%M:%S")
     result = result + " - "
+
     if packet['decoded']['portnum'] == "TELEMETRY_APP":
-        result += f"Received telementry update from {packet['fromId']}"
+
+        result += f"Received telementry update from {fromNode}"
+
+        #update our internal structure when we received the response
+        with dictAllNodesLock:
+            dictAllNodes[fromNode]["BotTasticData"]["TelemetryTimeReceived"] = timeStamp
+
+            logMessageToFile("/tmp/telemetry_result.txt", result)
+
+            saveDataToJSONfile("/tmp/allNodes.json", dictAllNodes)
     else:
         result += f"Received unexpected port {packet['decoded']['portnum']}"
-
-    logMessageToFile("/tmp/telemetry_result.txt", result)
 
 def sendTelementryToRandomNode(interface):
     # pick another node at random and send a message
@@ -468,8 +517,14 @@ def sendTelementryToRandomNode(interface):
                             r.device_metrics.uptime_seconds = uptime_seconds
      
                     if len(dictAllNodes) > 0:
-                        dest = random.choice(list(dictAllNodes))
-                        #print(f"Sending Telemetry to {dest}")
+                        with dictAllNodesLock:
+                            dest = random.choice(list(dictAllNodes))
+                            print(f"Sending Telemetry to {dest}")
+
+                            #record when we sent the request
+                            #dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = datetime.datetime.now()
+                            dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = datetime.datetime.now().isoformat()
+                            saveDataToJSONfile("/tmp/allNodes.json", dictAllNodes)
 
                         interface.sendData(r,
                                     destinationId=dest,
@@ -481,60 +536,60 @@ def sendTelementryToRandomNode(interface):
     except e:
         print("Error {e}")
 
+def main():
+    ############################
+    # main code
 
-############################
-# main code
+    #code for just testing splotch subprocess code
+    #SplotchPlusSendMessage("I don't like Windows")
+    #exit(1)
 
-#code for just testing splotch subprocess code
-#SplotchPlusSendMessage("I don't like Windows")
-#exit(1)
+    global knownNodes
+    knownNodes = loadDataFromJSONFile("nodes_to_interact_with.json")
 
+    # Print the array
+    print(">------- Known Nodes --------<")
+    print(knownNodes)
+    print(">----------------------------<")
 
-# Example usage
-#knownNodes = read_file_to_array("nodes_to_interact_with.txt")
-knownNodes = read_json_file("nodes_to_interact_with.json")
+    #pub.subscribe(onReceive, "meshtastic.receive")
+    pub.subscribe(onConnectionEstablished, "meshtastic.connection.established")
+    pub.subscribe(onConnectionLost, "meshtastic.connection.lost")
+    pub.subscribe(onNodeUpdated, "meshtastic.node.updated")
+    pub.subscribe(onReceiveText, "meshtastic.receive.text")
 
-# Print the array
-print(">------- Known Nodes --------<")
-print(knownNodes)
-print(">----------------------------<")
+    try:
+        interface = meshtastic.tcp_interface.TCPInterface(hostname='localhost')
 
-#pub.subscribe(onReceive, "meshtastic.receive")
-pub.subscribe(onConnectionEstablished, "meshtastic.connection.established")
-pub.subscribe(onConnectionLost, "meshtastic.connection.lost")
-pub.subscribe(onNodeUpdated, "meshtastic.node.updated")
-pub.subscribe(onReceiveText, "meshtastic.receive.text")
+        start_time = time.time()
+        
+        while True:
+            time.sleep(2)
 
-try:
-    interface = meshtastic.tcp_interface.TCPInterface(hostname='localhost')
-
-    start_time = time.time()
-    
-    while True:
-        time.sleep(2)
-
-        #keep an eye on the socket to see if it closed
-        if isSocketConnected(interface.socket):
-            None
-            #While connected wake up eveyr 5 seconds and do something
-            current_time = time.time()
-            elapsed = current_time - start_time
-
-            #send a message to a random node every 15 seconds
-            #checks to see if any node responds
-            if elapsed >= 15:
+            #keep an eye on the socket to see if it closed
+            if isSocketConnected(interface.socket):
                 None
-                if True: #if statement for turning this code on / off
-                    #print(f"{int(elapsed)} seconds have passed.")
-                    start_time = time.time()
+                #While connected wake up eveyr 5 seconds and do something
+                current_time = time.time()
+                elapsed = current_time - start_time
 
-                    # pick another node at random and send a message
-                    sendTelementryToRandomNode(interface)
-        else:
-            print("Socket is disconnected")
-            interface.close()
-            exit(4)
+                #send a message to a random node every 15 seconds
+                #checks to see if any node responds
+                if elapsed >= 3:
+                    None
+                    if True: #if statement for turning this code on / off
+                        #print(f"{int(elapsed)} seconds have passed.")
+                        start_time = time.time()
 
-except :
-    print("meshtastic.tcp_interface.TCPInterface failed")
+                        # pick another node at random and send a message
+                        sendTelementryToRandomNode(interface)
+            else:
+                print("Socket is disconnected")
+                interface.close()
+                exit(4)
 
+    except :
+        print("meshtastic.tcp_interface.TCPInterface failed")
+
+if __name__ == "__main__":
+    main()
