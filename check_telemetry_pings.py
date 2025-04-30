@@ -25,4 +25,4 @@ for nodeId in allNodes:
             rt = datetime.fromisoformat(recvTime)
 
         if sendTime != None and recvTime != None:
-            print(f"Delete between recv and send: {rt - st}")
+            print(f"Delay between recv and send: {rt - st}")
