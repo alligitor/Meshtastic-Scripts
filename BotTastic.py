@@ -10,7 +10,7 @@ import socket
 import select
 from meshtastic.protobuf import mesh_pb2, portnums_pb2, telemetry_pb2
 import random
-import datetime
+from datetime import datetime
 import threading
 import base64
 
@@ -160,11 +160,14 @@ def saveDataToJSONfile(filename, data):
     #currently, the dump function causes an error
     #saveDataToJSONfile Type <class 'meshtastic.protobuf.mesh_pb2.MeshPacket'> not serializable
     #disabling this until we figure it out
-    return
+    #return
 
     def default_serializer(obj):
         if isinstance(obj, bytes):
             return {'__bytes__': True, 'data': base64.b64encode(obj).decode('utf-8')}
+        else:
+            #if there's an error, just put some words, we'll debug later
+            return {'__bytes__': True, 'data': "^V^V^V^V^V^V^V^V^V^"}
         raise TypeError(f"Type {type(obj)} not serializable")
     try:
         # Save to file
@@ -469,7 +472,7 @@ def onReceiveDataPort_TELEMETRY_APP(packet):
     #print(f"    {packet}")
 
     fromNode = packet['fromId']
-    timeStamp = datetime.datetime.now()
+    timeStamp = datetime.now()
 
     result = timeStamp.strftime("%Y-%m-%d %H:%M:%S")
     result = result + " - "
@@ -480,7 +483,7 @@ def onReceiveDataPort_TELEMETRY_APP(packet):
 
         #update our internal structure when we received the response
         with dictAllNodesLock:
-            dictAllNodes[fromNode]["BotTasticData"]["TelemetryTimeReceived"] = timeStamp
+            dictAllNodes[fromNode]["BotTasticData"]["TelemetryTimeReceived"] = timeStamp.isoformat()
 
             logMessageToFile("/tmp/telemetry_result.txt", result)
 
@@ -522,8 +525,8 @@ def sendTelementryToRandomNode(interface):
                             print(f"Sending Telemetry to {dest}")
 
                             #record when we sent the request
-                            #dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = datetime.datetime.now()
-                            dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = datetime.datetime.now().isoformat()
+                            #dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = datetime.now()
+                            dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = datetime.now().isoformat()
                             saveDataToJSONfile("/tmp/allNodes.json", dictAllNodes)
 
                         interface.sendData(r,
@@ -575,7 +578,7 @@ def main():
 
                 #send a message to a random node every 15 seconds
                 #checks to see if any node responds
-                if elapsed >= 3:
+                if elapsed >= 120:
                     None
                     if True: #if statement for turning this code on / off
                         #print(f"{int(elapsed)} seconds have passed.")
