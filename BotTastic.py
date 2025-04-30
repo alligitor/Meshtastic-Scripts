@@ -24,6 +24,9 @@ dictAllNodesLock = threading.Lock()
 #list of known Nodes
 knownNodes = {}
 
+#file name for storing nodes in a json file
+nodeStorageFilename = "/tmp/allNodes.json"
+
 seperator="\n ---------------\n"
 
 #common messages people send to test their connection
@@ -188,10 +191,10 @@ def loadDataFromJSONFile(filename):
             return data
     except FileNotFoundError:
         print(f"File {file_path} not found.")
-        return []
+        return None
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON: {e}")
-        return []
+        return None
 
 # Function to read the file and store each line in an array
 def read_file_to_array(file_path):
@@ -299,7 +302,7 @@ def messageReplyTo(interface, message):
         print(f"{dictAllNodes}")
         reply = "number = " + str(len(dictAllNodes))
         with dictAllNodesLock:
-            saveDataToJSONfile("/tmp/allNodes.json", dictAllNodes)
+            saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
         message_type = "debug"
     elif (message_payload.lower() == "help"):
         reply = "available commands"
@@ -456,7 +459,7 @@ def onNodeUpdated(node, interface):
         if dictAllNodes[nodeId].get("BotTasticData") ==  None:
             dictAllNodes[nodeId]["BotTasticData"] = {}
 
-        saveDataToJSONfile("/tmp/allNodes.json", dictAllNodes)
+        saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
 
 def onReceiveText(packet, interface):
     #print(f"{seperator}Received Text: {packet}")
@@ -487,7 +490,7 @@ def onReceiveDataPort_TELEMETRY_APP(packet):
 
             logMessageToFile("/tmp/telemetry_result.txt", result)
 
-            saveDataToJSONfile("/tmp/allNodes.json", dictAllNodes)
+            saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
     else:
         result += f"Received unexpected port {packet['decoded']['portnum']}"
 
@@ -527,7 +530,7 @@ def sendTelementryToRandomNode(interface):
                             #record when we sent the request
                             #dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = datetime.now()
                             dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = datetime.now().isoformat()
-                            saveDataToJSONfile("/tmp/allNodes.json", dictAllNodes)
+                            saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
 
                         interface.sendData(r,
                                     destinationId=dest,
@@ -549,6 +552,13 @@ def main():
 
     global knownNodes
     knownNodes = loadDataFromJSONFile("nodes_to_interact_with.json")
+
+    global dictAllNodes
+    dictAllNodes = loadDataFromJSONFile(nodeStorageFilename)
+    if dictAllNodes == None:
+        dictAllNodes = {}
+    print(f'Loaded {len(dictAllNodes)} nodes from storage')
+
 
     # Print the array
     print(">------- Known Nodes --------<")
