@@ -182,7 +182,10 @@ def saveDataToJSONfile(filename, data):
 def loadDataFromJSONFile(filename):
     def object_hook(obj):
         if '__bytes__' in obj:
-            return base64.b64decode(obj['data'].encode('utf-8'))
+            if obj['data'] == "^V^V^V^V^V^V^V^V^V^":
+                return obj
+            else:
+                return base64.b64decode(obj['data'].encode('utf-8'))
         return obj
 
     try:
@@ -298,9 +301,9 @@ def messageReplyTo(interface, message):
             hopCount = message["hopStart"] - message["hopLimit"]
             reply = reply + "\nHops:" + str(hopCount)
         message_type = "connection_test"
-    elif (message_payload.lower() == "xxx"):
-        print(f"{dictAllNodes}")
-        reply = "number = " + str(len(dictAllNodes))
+    elif (message_payload.lower() == "debug"):
+        #print(f"{dictAllNodes}")
+        reply = "known nodes = " + str(len(dictAllNodes))
         with dictAllNodesLock:
             saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
         message_type = "debug"
