@@ -497,6 +497,13 @@ def onReceiveDataPort_TELEMETRY_APP(packet):
     else:
         result += f"Received unexpected port {packet['decoded']['portnum']}"
 
+
+def sendTraceRouteToRandomNode(interface):
+    #pick a random onde to send a trace route to
+    None
+    dest = "Random Node"
+    print(f"Sending Trace Route to {dest}")
+
 def sendTelementryToRandomNode(interface):
     # pick another node at random and send a message
     #print("sendTelementryToRandomNode")
@@ -524,7 +531,7 @@ def sendTelementryToRandomNode(interface):
                         uptime_seconds = metrics.get("uptimeSeconds")
                         if uptime_seconds is not None:
                             r.device_metrics.uptime_seconds = uptime_seconds
-     
+
                     if len(dictAllNodes) > 0:
                         with dictAllNodesLock:
                             dest = random.choice(list(dictAllNodes))
@@ -577,28 +584,44 @@ def main():
     try:
         interface = meshtastic.tcp_interface.TCPInterface(hostname='localhost')
 
-        start_time = time.time()
-        
+        start_time_telemetry = time.time()
+        start_time_traceroute = time.time()
+
         while True:
             time.sleep(2)
 
             #keep an eye on the socket to see if it closed
             if isSocketConnected(interface.socket):
-                None
-                #While connected wake up eveyr 5 seconds and do something
                 current_time = time.time()
-                elapsed = current_time - start_time
 
-                #send a message to a random node every 15 seconds
-                #checks to see if any node responds
-                if elapsed >= 120:
-                    None
+
+                #Send a telemetry request every XXX often
+                elapsed_time_telemetry = current_time - start_time_telemetry
+                if elapsed_time_telemetry >= 120:
                     if True: #if statement for turning this code on / off
-                        #print(f"{int(elapsed)} seconds have passed.")
-                        start_time = time.time()
+                        #print(f"{int(elapsed_time_telemetry)} seconds have passed.")
+                        start_time_telemetry = time.time()
 
                         # pick another node at random and send a message
                         sendTelementryToRandomNode(interface)
+                    else:
+                        None
+
+
+                elapsed_time_traceroute = current_time - start_time_traceroute
+                #Send a traceroute request every XXX often
+                if elapsed_time_traceroute >= 60:
+                    if True: #if statement for turning this code on / off
+                        #print(f"{int(elapsed_time_telemetry)} seconds have passed.")
+                        start_time_traceroute = time.time()
+
+                        # pick another node at random and send a trace route
+                        sendTraceRouteToRandomNode(interface)
+                    else:
+                        None
+
+
+
             else:
                 print("Socket is disconnected")
                 interface.close()
