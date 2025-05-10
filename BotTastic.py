@@ -244,6 +244,10 @@ def messageReplyTo(interface, message):
     sender = message["fromId"]
     destination = message["toId"]
 
+    #seems like sometimes messages don't have a sender!
+    #put this here to catch that
+    if sender == None:
+        sender = "?"
     #print my node information to see what it looks like
     myNodeInfo = interface.getMyNodeInfo()
 
