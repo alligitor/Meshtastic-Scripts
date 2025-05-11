@@ -41,6 +41,17 @@ def logMessageToFile(file_name, text_to_append):
 	#ignore errors
         None
 
+#get a random line from a text file
+def getRandomLineFromTextFile(file_path):
+    retVal = ""
+    try:
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+        retVal = random.choice(lines).strip()
+    except:
+        retVal = "Is today a good day to die?"
+    return retVal
+
 # routine to see if a socket is open or close
 def isSocketConnected(sock):
     r, _, _ = select.select([sock], [], [], 0)
@@ -319,6 +330,9 @@ def messageReplyTo(interface, message):
         reply = reply + "\nping"
         reply = reply + "\ndistance"
         message_type = "help"
+    elif (message_payload.lower()[:len("fortune")] == "fortune"):
+        #someone reqeusted a fortuen
+        reply = getRandomLineFromTextFile("fortunes.txt")
     elif (message_payload.lower()[:len("echo")] == "echo"):
         #someone reqeusted a echo
         reply = "echoing: "
