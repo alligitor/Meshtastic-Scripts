@@ -259,6 +259,9 @@ def messageReplyTo(interface, message):
     #put this here to catch that
     if sender == None:
         sender = "?"
+        #since the message doesn't have a sender, print it so perhaps we can debug
+        print(f"Message with ? for sender: {message}")
+
     #print my node information to see what it looks like
     myNodeInfo = interface.getMyNodeInfo()
 
@@ -390,7 +393,7 @@ def messageReplyTo(interface, message):
         knownNode = findKnownNode(sender)
 
         if knownNode != None:
-            conversation_log += f"B/C Message from known node {sender}.\n"
+            conversation_log += f"B/C Message from known node {sender}\n"
             if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed"]:
                 send_reply = True
         else:
@@ -463,7 +466,23 @@ def onNodeUpdated(node, interface):
 
     #add to global node dictionary
     with dictAllNodesLock:
-        dictAllNodes.update( {nodeId : node})
+        #is the new node in the database
+        if dictAllNodes.get(nodeId) == None:
+            #new node, just added it
+            dictAllNodes.update( {nodeId : node})
+        else:
+            #node exists, see if it has bottastic data
+            if dictAllNodes[nodeId].get("BotTasticData") ==  None:
+                #existing node doesn't have BotTastic Data
+                dictAllNodes.update( {nodeId : node})
+                dictAllNodes[nodeId]["BotTasticData"] = {}
+            else:
+                #existing node has BotTastic data
+                botTasticData = dictAllNodes[nodeId]["BotTasticData"]
+                dictAllNodes.update( {nodeId : node})
+                dictAllNodes[nodeId].update( {"BotTasticData" : botTasticData})
+
+        saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
 
     # if it's one of the known nodes, send it a message
     knownNode = findKnownNode(nodeId)
@@ -474,13 +493,6 @@ def onNodeUpdated(node, interface):
                 interface.sendText(knownNode.get('message'), nodeId)
             case _:
                 None
-
-    #add a new dictionary to the node for storing my data
-    with dictAllNodesLock:
-        if dictAllNodes[nodeId].get("BotTasticData") ==  None:
-            dictAllNodes[nodeId]["BotTasticData"] = {}
-
-        saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
 
 def onReceiveText(packet, interface):
     #print(f"{seperator}Received Text: {packet}")
@@ -515,12 +527,16 @@ def onReceiveDataPort_TELEMETRY_APP(packet):
     else:
         result += f"Received unexpected port {packet['decoded']['portnum']}"
 
-
 def sendTraceRouteToRandomNode(interface):
     #pick a random onde to send a trace route to
-    None
-    dest = "Random Node"
-    print(f"Sending Trace Route to {dest}")
+    if len(dictAllNodes) > 0:
+        with dictAllNodesLock:
+            dest = random.choice(list(dictAllNodes))
+            print(f"Sending Trace Route to {dest}")
+
+            #record when we sent the request
+            #dictAllNodes[dest]["BotTasticData"]["TraceRouteTimeSent"] = datetime.now().isoformat()
+            #saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
 
 def sendTelementryToRandomNode(interface):
     # pick another node at random and send a message
@@ -556,7 +572,6 @@ def sendTelementryToRandomNode(interface):
                             print(f"Sending Telemetry to {dest}")
 
                             #record when we sent the request
-                            #dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = datetime.now()
                             dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = datetime.now().isoformat()
                             saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
 
