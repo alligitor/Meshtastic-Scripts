@@ -511,9 +511,9 @@ def onReceiveDataPort_TRACEROUTE_APP(packet):
     #print(f"    {packet}")
 
     fromNode = packet['fromId']
-    timeStamp = datetime.now()
+    timeStamp = datetime.now().isoformat()
 
-    result = timeStamp.strftime("%Y-%m-%d %H:%M:%S")
+    result = str(timeStamp)
     result = result + " - "
 
     if packet['decoded']['portnum'] == "TRACEROUTE_APP":
@@ -522,7 +522,7 @@ def onReceiveDataPort_TRACEROUTE_APP(packet):
 
         #update our internal structure when we received the response
         with dictAllNodesLock:
-            dictAllNodes[fromNode]["BotTasticData"]["TraceRouteTimeReceived"] = timeStamp.isoformat()
+            dictAllNodes[fromNode]["BotTasticData"]["TraceRouteTimeReceived"] = timeStamp
 
             saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
     else:
@@ -535,9 +535,9 @@ def onReceiveDataPort_TELEMETRY_APP(packet):
     #print(f"    {packet}")
 
     fromNode = packet['fromId']
-    timeStamp = datetime.now()
+    timeStamp = datetime.now().isoformat()
 
-    result = timeStamp.strftime("%Y-%m-%d %H:%M:%S")
+    result = str(timeStamp)
     result = result + " - "
 
     if packet['decoded']['portnum'] == "TELEMETRY_APP":
@@ -546,7 +546,7 @@ def onReceiveDataPort_TELEMETRY_APP(packet):
 
         #update our internal structure when we received the response
         with dictAllNodesLock:
-            dictAllNodes[fromNode]["BotTasticData"]["TelemetryTimeReceived"] = timeStamp.isoformat()
+            dictAllNodes[fromNode]["BotTasticData"]["TelemetryTimeReceived"] = timeStamp
 
             saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
     else:
@@ -556,32 +556,42 @@ def onReceiveDataPort_TELEMETRY_APP(packet):
 
 def sendTraceRouteToRandomNode(interface):
     #pick a random onde to send a trace route to
+    timeStamp = datetime.now().isoformat()
+
+    result = str(timeStamp)
+    result = result + " - "
     try:
         if len(dictAllNodes) > 0:
             with dictAllNodesLock:
                 dest = random.choice(list(dictAllNodes))
-                dest = "!433ed730"
-                logMessageToFile("/tmp/traceroute_result.txt", f"Sending Trace Route to {dest}")
+                result += f"Sending Trace Route to {dest}"
 
-                r = mesh_pb2.RouteDiscovery()
-                interface.sendData(
-                    r,
-                    destinationId=dest,
-                    portNum=portnums_pb2.PortNum.TRACEROUTE_APP,
-                    wantResponse=True,
-                    onResponse=onReceiveDataPort_TRACEROUTE_APP,
-                    channelIndex=0,
-                    hopLimit=7,
-                )
                 #record when we sent the request
-                dictAllNodes[dest]["BotTasticData"]["TraceRouteTimeSent"] = datetime.now().isoformat()
+                dictAllNodes[dest]["BotTasticData"]["TraceRouteTimeSent"] = timeStamp
                 saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
+
+            r = mesh_pb2.RouteDiscovery()
+            interface.sendData(
+                r,
+                destinationId=dest,
+                portNum=portnums_pb2.PortNum.TRACEROUTE_APP,
+                wantResponse=True,
+                onResponse=onReceiveDataPort_TRACEROUTE_APP,
+                channelIndex=0,
+                hopLimit=7,
+            )
     except e:
-       print("sendTraceRouteToRandomNode Error {e}")
+       result += f"sendTraceRouteToRandomNode Error {e}"
+
+    logMessageToFile("/tmp/traceroute_result.txt", result)
 
 def sendTelementryToRandomNode(interface):
     # pick another node at random and send a message
-    #print("sendTelementryToRandomNode")
+
+    timeStamp = datetime.now().isoformat()
+
+    result = str(timeStamp)
+    result = result + " - "
     try:
         if interface.nodesByNum is not None:
             node = interface.nodesByNum.get(interface.localNode.nodeNum)
@@ -610,10 +620,10 @@ def sendTelementryToRandomNode(interface):
                     if len(dictAllNodes) > 0:
                         with dictAllNodesLock:
                             dest = random.choice(list(dictAllNodes))
-                            logMessageToFile("/tmp/telemetry_result.txt", f"Sending Telemetry to {dest}")
+                            result += f"Sending Telemetry to {dest}"
 
                             #record when we sent the request
-                            dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = datetime.now().isoformat()
+                            dictAllNodes[dest]["BotTasticData"]["TelemetryTimeSent"] = timeStamp
                             saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
 
                         interface.sendData(r,
@@ -624,7 +634,9 @@ def sendTelementryToRandomNode(interface):
                                     channelIndex=0,
                                     )
     except e:
-        print("sendTelementryToRandomNode Error {e}")
+        result += f"sendTelementryToRandomNode Error {e}"
+
+    logMessageToFile("/tmp/telemetry_result.txt", result)
 
 def main():
     ############################
@@ -645,9 +657,11 @@ def main():
 
 
     # Print the array
+    """
     print(">------- Known Nodes --------<")
     print(knownNodes)
     print(">----------------------------<")
+    """
 
     #pub.subscribe(onReceive, "meshtastic.receive")
     pub.subscribe(onConnectionEstablished, "meshtastic.connection.established")
@@ -668,10 +682,9 @@ def main():
             if isSocketConnected(interface.socket):
                 current_time = time.time()
 
-
                 #Send a telemetry request every XXX often
                 elapsed_time_telemetry = current_time - start_time_telemetry
-                if elapsed_time_telemetry >= 120:
+                if elapsed_time_telemetry >= 60:
                     if True: #if statement for turning this code on / off
                         #print(f"{int(elapsed_time_telemetry)} seconds have passed.")
                         start_time_telemetry = time.time()
@@ -680,7 +693,6 @@ def main():
                         sendTelementryToRandomNode(interface)
                     else:
                         None
-
 
                 elapsed_time_traceroute = current_time - start_time_traceroute
                 #Send a traceroute request every XXX often
@@ -693,9 +705,6 @@ def main():
                         sendTraceRouteToRandomNode(interface)
                     else:
                         None
-
-
-
             else:
                 print("Socket is disconnected")
                 interface.close()
