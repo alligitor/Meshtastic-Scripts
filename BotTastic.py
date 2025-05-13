@@ -336,6 +336,7 @@ def messageReplyTo(interface, message):
     elif (message_payload.lower()[:len("fortune")] == "fortune"):
         #someone reqeusted a fortuen
         reply = getRandomLineFromTextFile("fortunes.txt")
+        message_type = "fortune"
     elif (message_payload.lower()[:len("echo")] == "echo"):
         #someone reqeusted a echo
         reply = "echoing: "
@@ -394,12 +395,12 @@ def messageReplyTo(interface, message):
 
         if knownNode != None:
             conversation_log += f"B/C Message from known node {sender}"
-            if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed", "distance"]:
+            if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed", "distance", "fortune"]:
                 send_reply = True
         else:
             conversation_log += f"B/C Message from unknown node {sender}"
             #in public channel limit replies to a few things such as connection_test, help, echo
-            if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed", "distance"]:
+            if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed", "distance", "fortune"]:
                 send_reply = True
     else:
         #message was to us directly
