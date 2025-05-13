@@ -394,12 +394,12 @@ def messageReplyTo(interface, message):
 
         if knownNode != None:
             conversation_log += f"B/C Message from known node {sender}"
-            if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed"]:
+            if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed", "distance"]:
                 send_reply = True
         else:
             conversation_log += f"B/C Message from unknown node {sender}"
             #in public channel limit replies to a few things such as connection_test, help, echo
-            if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed"]:
+            if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed", "distance"]:
                 send_reply = True
     else:
         #message was to us directly
