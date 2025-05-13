@@ -383,8 +383,8 @@ def messageReplyTo(interface, message):
             message_type = "splotchplus"
 
     #create the message that goes to the console about the message
-    conversation_log = ""
-    conversation_log += "---->\n"
+    conversation_log = "---->\n"
+    conversation_log += str(datetime.now()) + "\n"
     #the following code modifies destination, keep a copy of the original one
     original_destination = destination
 
@@ -393,11 +393,11 @@ def messageReplyTo(interface, message):
         knownNode = findKnownNode(sender)
 
         if knownNode != None:
-            conversation_log += f"B/C Message from known node {sender}\n"
+            conversation_log += f"B/C Message from known node {sender}"
             if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed"]:
                 send_reply = True
         else:
-            conversation_log += f"B/C Message from unknown node {sender}\n"
+            conversation_log += f"B/C Message from unknown node {sender}"
             #in public channel limit replies to a few things such as connection_test, help, echo
             if message_type in ["connection_test", "help", "echo", "ping", "splotchplus_directed"]:
                 send_reply = True
@@ -405,20 +405,23 @@ def messageReplyTo(interface, message):
         #message was to us directly
         knownNode = findKnownNode(sender)
         if knownNode != None:
-            conversation_log += f"D/M Message from known node {sender}.\n"
+            conversation_log += f"D/M Message from known node {sender}"
             send_reply = True
             destination = sender
         else:
-            conversation_log += f"D/M Message from unknown node {sender}\n"
+            conversation_log += f"D/M Message from unknown node {sender}"
             send_reply = True
             destination = sender
+
+    #this line adds to the end of previous one, no \n should have been included
+    conversation_log += f" --> {original_destination}\n"
+
 
     #prepend @sender to the begining of messages if destination is public channel
     if (destination == "^all"):
         reply = "@" + sender + "\n" + reply
 
     #build a string of the message and reply to log
-    conversation_log += f"       sent to destination: {original_destination}\n"
     conversation_log += f"\nInitial: {message_payload}\nReply: {reply}\n"
 
     if send_reply == True:
