@@ -356,7 +356,7 @@ def messageReplyTo(interface, message):
                     # print(f"My     Position: {myLatitude}, {myLongitute}")
                     # print(f"Sender Position: {senderLatitude}, {senderLongitute}")
                     distance = haversine(senderLatitude, senderLongitute, myLatitude, myLongitute)
-                    reply = f"We are {distance} km apart"
+                    reply = f"We are {distance:.3f} km apart"
                 else:
                     reply = "you don't have position info"
             else:
