@@ -308,13 +308,13 @@ def messageReplyTo(interface, message):
         if "pkiEncrypted" in message:
             reply = reply + "\npkiEncrypted:" + str(message["pkiEncrypted"])
         if "wantAck" in message:
-            reply = reply + "wantAck:" + str(message["wantAck"])
+            reply = reply + "\nwantAck:" + str(message["wantAck"])
         if "rxSnr" in message:
-            reply = reply + "rxSnr:" + str(message["rxSnr"])
+            reply = reply + "\nrxSnr:" + str(message["rxSnr"])
         if "rxRssi" in message:
-            reply = reply + "rxRssi:" + str(message["rxRssi"])
+            reply = reply + "\nrxRssi:" + str(message["rxRssi"])
         if "hopLimit" in message and "hopStart" in message:
-            reply = reply + "hopLimit:" + str(message["hopLimit"])
+            reply = reply + "\nhopLimit:" + str(message["hopLimit"])
             reply = reply + "\nhopStart:" + str(message["hopStart"])
             hopCount = message["hopStart"] - message["hopLimit"]
             reply = reply + "\nHops:" + str(hopCount)
