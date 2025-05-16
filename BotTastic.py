@@ -254,15 +254,9 @@ def getNodeInfo(interface, target_node_id):
     return returnedNode
 
 def messageReplyTo(interface, message):
-    sender = message["fromId"]
-    destination = message["toId"]
 
-    #seems like sometimes messages don't have a sender!
-    #put this here to catch that
-    if sender == None:
-        #since the message doesn't have a sender, print it so perhaps we can debug
-        sender = f'!{message["from"]:08x}'
-        print(f"Message with ? for sender: {message}\nSetting sender to {sender}")
+    sender = f'!{message["from"]:08x}'
+    destination = f'!{message["to"]:08x}'
 
     #print my node information to see what it looks like
     myNodeInfo = interface.getMyNodeInfo()
@@ -282,8 +276,6 @@ def messageReplyTo(interface, message):
     myNodeAliases.append("@" + myNodeId[-4:]) #last 4 of the id, starting with @
     myNodeAliases.append(myNodeId) #all 8 digits
     myNodeAliases.append("@" + myNodeId) # @ followed by all 8 digits
-
-
 
     #dig up the node info from the interface object
     senderNode = getNodeInfo(interface, sender)
@@ -391,7 +383,7 @@ def messageReplyTo(interface, message):
     #the following code modifies destination, keep a copy of the original one
     original_destination = destination
 
-    if destination == "^all":
+    if destination == "!ffffffff":
         # message was broadcast to all
         knownNode = findKnownNode(sender)
 
@@ -421,7 +413,7 @@ def messageReplyTo(interface, message):
 
 
     #prepend @sender to the begining of messages if destination is public channel
-    if (destination == "^all"):
+    if (destination == "!ffffffff"):
         reply = "@" + sender + "\n" + reply
 
     #build a string of the message and reply to log
@@ -429,7 +421,7 @@ def messageReplyTo(interface, message):
 
     if send_reply == True:
         conversation_log += f"Sending message to {destination}\n"
-        if destination == "^all":
+        if destination == "!ffffffff":
             interface.sendText(reply)
         else:
             interface.sendText(reply, destination)
@@ -503,6 +495,9 @@ def onReceiveText(packet, interface):
     #print(f"{seperator}Received Text: {packet}")
     #put a marker here so it's easier for us to see when a new text packet has come in
     print(">------------------------------------<")
+    # for debugging packet issue, print the whole packet
+    #print(f"{packet}")
+    #print(">------------------<")
     try:
         messageReplyTo(interface, packet)
     except:
