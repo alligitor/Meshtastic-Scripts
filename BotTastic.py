@@ -15,7 +15,7 @@ import threading
 import base64
 
 
-#global variables
+#region global variables
 
 # dictionary for holding all the nodes we get via onNodeUpdated
 dictAllNodes = {}
@@ -31,9 +31,10 @@ seperator="\n ---------------\n"
 
 #common messages people send to test their connection
 connection_test_requests = ["testing", "test", "radio check", "antenna check"]
+#endregion
 
-#function to save a string to a file. 
 def logMessageToFile(file_name, text_to_append):
+    #function to save a string to a file. 
     try:
         with open(file_name, 'a') as file:
             file.write(text_to_append + '\n')
@@ -41,8 +42,8 @@ def logMessageToFile(file_name, text_to_append):
 	#ignore errors
         None
 
-#get a random line from a text file
 def getRandomLineFromTextFile(file_path):
+    #get a random line from a text file
     retVal = ""
     try:
         with open(file_path, 'r') as file:
@@ -52,8 +53,8 @@ def getRandomLineFromTextFile(file_path):
         retVal = "Is today a good day to die?"
     return retVal
 
-# routine to see if a socket is open or close
 def isSocketConnected(sock):
+    # routine to see if a socket is open or close
     r, _, _ = select.select([sock], [], [], 0)
     if r:
         data = sock.recv(1, socket.MSG_PEEK)
@@ -61,8 +62,9 @@ def isSocketConnected(sock):
             return False
     return True
 
-# Function to calculate distance between two GPS points using the Haversine formula
 def haversine(lat1, lon1, lat2, lon2):
+    # Function to calculate distance between two GPS points using the Haversine formula
+
     # Radius of Earth in kilometers (use 3958.8 for miles)
     R = 6371.0
 
@@ -210,8 +212,8 @@ def loadDataFromJSONFile(filename):
         print(f"Error decoding JSON: {e}")
         return None
 
-# Function to read the file and store each line in an array
 def read_file_to_array(file_path):
+    # Function to read the file and store each line in an array
     lines = []  # Initialize an empty list
     try:
         with open(file_path, 'r') as file:
@@ -258,9 +260,9 @@ def messageReplyTo(interface, message):
     #seems like sometimes messages don't have a sender!
     #put this here to catch that
     if sender == None:
-        sender = "?"
         #since the message doesn't have a sender, print it so perhaps we can debug
-        print(f"Message with ? for sender: {message}")
+        sender = f'!{message["from"]:08x}'
+        print(f"Message with ? for sender: {message}\nSetting sender to {sender}")
 
     #print my node information to see what it looks like
     myNodeInfo = interface.getMyNodeInfo()
@@ -462,11 +464,9 @@ def onConnectionLost(interface):
     print(f"{seperator}Lost connection to the radio")
 
 def onNodeUpdated(node, interface):
-    #print(f"{seperator}Node updated")
-    #print(f"{node}")
-    #print(f'User ID = {node["user"]["id"]}')
-
     nodeId = node["user"]["id"]
+
+    #print(f"onNodeUpdated node ID: {nodeId}")
 
     #add to global node dictionary
     with dictAllNodesLock:
@@ -474,6 +474,7 @@ def onNodeUpdated(node, interface):
         if dictAllNodes.get(nodeId) == None:
             #new node, just added it
             dictAllNodes.update( {nodeId : node})
+            dictAllNodes[nodeId]["BotTasticData"] = {}
         else:
             #node exists, see if it has bottastic data
             if dictAllNodes[nodeId].get("BotTasticData") ==  None:
@@ -511,47 +512,53 @@ def onReceiveDataPort_TRACEROUTE_APP(packet):
     #print(">------------------------------------<")
     #print(f"    {packet}")
 
-    fromNode = packet['fromId']
     timeStamp = datetime.now().isoformat()
 
     result = str(timeStamp)
-    result = result + " - "
+    result += " - "
+    try:
+        fromNode = packet['fromId']
 
-    if packet['decoded']['portnum'] == "TRACEROUTE_APP":
+        if packet['decoded']['portnum'] == "TRACEROUTE_APP":
 
-        result += f"Received traceroute update from {fromNode}"
+            result += f"Received traceroute update from {fromNode}"
 
-        #update our internal structure when we received the response
-        with dictAllNodesLock:
-            dictAllNodes[fromNode]["BotTasticData"]["TraceRouteTimeReceived"] = timeStamp
+            #update our internal structure when we received the response
+            with dictAllNodesLock:
+                dictAllNodes[fromNode]["BotTasticData"]["TraceRouteTimeReceived"] = timeStamp
 
-            saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
-    else:
-        result += f"Received unexpected port {packet['decoded']['portnum']}"
-
+                saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
+        else:
+            result += f"Received unexpected port {packet['decoded']['portnum']}"
+    except Exception as e:
+       result += f"onReceiveDataPort_TRACEROUTE_APP Error {e}"
+        
     logMessageToFile("/tmp/traceroute_result.txt", result)
 
 def onReceiveDataPort_TELEMETRY_APP(packet):
     #print(">------------------------------------<")
     #print(f"    {packet}")
 
-    fromNode = packet['fromId']
     timeStamp = datetime.now().isoformat()
 
     result = str(timeStamp)
-    result = result + " - "
+    result += " - "
+    try:
+        fromNode = packet['fromId']
 
-    if packet['decoded']['portnum'] == "TELEMETRY_APP":
+        if packet['decoded']['portnum'] == "TELEMETRY_APP":
 
-        result += f"Received telemetry update from {fromNode}"
+            result += f"Received telemetry update from {fromNode}"
 
-        #update our internal structure when we received the response
-        with dictAllNodesLock:
-            dictAllNodes[fromNode]["BotTasticData"]["TelemetryTimeReceived"] = timeStamp
+            #update our internal structure when we received the response
+            with dictAllNodesLock:
+                dictAllNodes[fromNode]["BotTasticData"]["TelemetryTimeReceived"] = timeStamp
 
-            saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
-    else:
-        result += f"Received unexpected port {packet['decoded']['portnum']}"
+                saveDataToJSONfile(nodeStorageFilename, dictAllNodes)
+        else:
+            result += f"Received unexpected port {packet['decoded']['portnum']}"
+    except Exception as e:
+       result += f"onReceiveDataPort_TELEMETRY_APP Error {e}"
 
     logMessageToFile("/tmp/telemetry_result.txt", result)
 
@@ -581,7 +588,7 @@ def sendTraceRouteToRandomNode(interface):
                 channelIndex=0,
                 hopLimit=7,
             )
-    except e:
+    except Exception as e:
        result += f"sendTraceRouteToRandomNode Error {e}"
 
     logMessageToFile("/tmp/traceroute_result.txt", result)
@@ -634,7 +641,7 @@ def sendTelementryToRandomNode(interface):
                                     onResponse=onReceiveDataPort_TELEMETRY_APP,
                                     channelIndex=0,
                                     )
-    except e:
+    except Exception as e:
         result += f"sendTelementryToRandomNode Error {e}"
 
     logMessageToFile("/tmp/telemetry_result.txt", result)
@@ -676,7 +683,9 @@ def main():
         start_time_telemetry = time.time()
         start_time_traceroute = time.time()
 
-        while True:
+        mainLoopActive = True
+
+        while mainLoopActive:
             time.sleep(2)
 
             #keep an eye on the socket to see if it closed
@@ -709,10 +718,10 @@ def main():
             else:
                 print("Socket is disconnected")
                 interface.close()
-                exit(4)
+                mainLoopActive = False
 
-    except :
-        print("meshtastic.tcp_interface.TCPInterface failed")
+    except Exception as e:
+        print("meshtastic.tcp_interface.TCPInterface failed: {e}")
 
 if __name__ == "__main__":
     main()
