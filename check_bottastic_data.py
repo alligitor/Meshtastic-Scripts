@@ -34,3 +34,5 @@ for nodeId in allNodes:
     if  botTasticData != None:
         getTimeStamps("Telemetry", botTasticData)
         getTimeStamps("TraceRoute", botTasticData)
+    else:
+        print(f"Node without BotTasticData: {nodeId}")
