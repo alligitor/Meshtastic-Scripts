@@ -7,8 +7,8 @@ def getTimeStamps(key, data):
     fullSentKey = key + "TimeSent"
     fullRecvKey = key + "TimeReceived"
 
-    sendTime = node.get("BotTasticData").get(fullSentKey)
-    recvTime = node.get("BotTasticData").get(fullRecvKey)
+    sendTime = data.get(fullSentKey)
+    recvTime = data.get(fullRecvKey)
 
     print(f" {key} Send time {sendTime}")
     print(f" {key} Recv time {recvTime}")
@@ -22,17 +22,20 @@ def getTimeStamps(key, data):
     if sendTime != None and recvTime != None:
         print(f"  {key} delay between recv and send: {rt - st}")
 
+def main():
+    # Load from file
+    with open("/tmp/allNodes.json", 'r') as f:
+        allNodes = json.load(f)
 
-# Load from file
-with open("/tmp/allNodes.json", 'r') as f:
-    allNodes = json.load(f)
+    for nodeId in allNodes:
+        print(f"Found node {nodeId}")
+        node = allNodes[nodeId]
+        botTasticData = node.get("BotTasticData")
+        if  botTasticData != None:
+            getTimeStamps("Telemetry", botTasticData)
+            getTimeStamps("TraceRoute", botTasticData)
+        else:
+            print(f"Node without BotTasticData: {nodeId}")
 
-for nodeId in allNodes:
-    print(f"Found node {nodeId}")
-    node = allNodes[nodeId]
-    botTasticData = node.get("BotTasticData")
-    if  botTasticData != None:
-        getTimeStamps("Telemetry", botTasticData)
-        getTimeStamps("TraceRoute", botTasticData)
-    else:
-        print(f"Node without BotTasticData: {nodeId}")
+if __name__ == "__main__":
+    main()
