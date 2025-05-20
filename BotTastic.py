@@ -496,8 +496,8 @@ def onReceiveText(packet, interface):
     #put a marker here so it's easier for us to see when a new text packet has come in
     print(">------------------------------------<")
     # for debugging packet issue, print the whole packet
-    #print(f"{packet}")
-    #print(">------------------<")
+    logMessageToFile("/tmp/packets.txt", ">------------------------------------<")
+    logMessageToFile("/tmp/packets.txt", f"{packet}")
     try:
         messageReplyTo(interface, packet)
     except:
