@@ -336,7 +336,7 @@ def messageReplyTo(interface, message):
         reply = "echoing: "
         reply = reply + message_payload[len("echo"):]
         message_type = "echo"
-    elif (message_payload.lower() == "distance"):
+    elif (message_payload.lower()[:len("distance")] == "distance"):
         #someone reqeusted a distance calculation
         with dictAllNodesLock:
             if sender in dictAllNodes:
@@ -353,7 +353,7 @@ def messageReplyTo(interface, message):
                     distance = haversine(senderLatitude, senderLongitute, myLatitude, myLongitute)
                     reply = f"We are {distance:.3f} km apart"
                 else:
-                    reply = "you don't have position info"
+                    reply = "Your node doesn't seem to have position information"
             else:
                 reply = "Sorry, don't know about your node"
 
