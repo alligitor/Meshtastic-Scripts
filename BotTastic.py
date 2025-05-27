@@ -687,8 +687,11 @@ def main():
             if isSocketConnected(interface.socket):
                 current_time = time.time()
 
-                #Send a telemetry request every XXX often
                 elapsed_time_telemetry = current_time - start_time_telemetry
+                #disable telemetry
+                elapsed_time_telemetry = 0
+
+                #Send a telemetry request every XXX often
                 if elapsed_time_telemetry >= 60:
                     if True: #if statement for turning this code on / off
                         #print(f"{int(elapsed_time_telemetry)} seconds have passed.")
@@ -700,6 +703,9 @@ def main():
                         None
 
                 elapsed_time_traceroute = current_time - start_time_traceroute
+                #disable trace route
+                elapsed_time_traceroute = 0
+
                 #Send a traceroute request every XXX often
                 if elapsed_time_traceroute >= 31:
                     if True: #if statement for turning this code on / off
