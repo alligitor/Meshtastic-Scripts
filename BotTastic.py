@@ -13,7 +13,16 @@ import random
 from datetime import datetime
 import threading
 import base64
-
+from meshtastic import (
+    BROADCAST_ADDR,
+    BROADCAST_NUM,
+    LOCAL_ADDR,
+    NODELESS_WANT_CONFIG_ID,
+    ResponseHandler,
+    protocols,
+    publishingThread,
+)
+from typing import  Any, List, Optional, Union, Callable
 
 #region global variables
 
@@ -31,7 +40,53 @@ seperator="\n ---------------\n"
 
 #common messages people send to test their connection
 connection_test_requests = ["testing", "test", "radio check", "antenna check"]
+
+#default hop limit, but we'll try to get it from the nodes' configuration
+configuredHopLimit = 3
+
 #endregion
+
+def mySendText(
+    interface,
+    text: str,
+    destinationId: Union[int, str] = BROADCAST_ADDR,
+    wantAck: bool = False,
+    wantResponse: bool = False,
+    onResponse: Optional[Callable[[dict], Any]] = None,
+    channelIndex: int = 0,
+    portNum: portnums_pb2.PortNum.ValueType = portnums_pb2.PortNum.TEXT_MESSAGE_APP,
+    hopLimit: int = 3,
+    ):
+    #the python library's sentText doesn't have hop_limit as an argument
+    #copied sendText directly from their library, put it here, and added hopLimit
+
+    return interface.sendData(
+        text.encode("utf-8"),
+        destinationId,
+        portNum=portNum,
+        wantAck=wantAck,
+        wantResponse=wantResponse,
+        onResponse=onResponse,
+        channelIndex=channelIndex,
+        hopLimit=hopLimit,
+    )
+
+def getConfiguredHopLimit(interface):
+    try:
+        #print my node information to see what it looks like
+        # Retrieve the local node
+        myNode = interface.getNode('^local')
+        #print(f"myNode = {myNode}")
+
+        # Access and print the current preferences
+        localConfig = myNode.localConfig
+        #print(f"Current preferences: {localConfig}")
+
+        global configuredHopLimit
+        configuredHopLimit = localConfig.lora.hop_limit
+        #print(f"Configured hopLimit = {configuredHopLimit}")
+    except Exception as e:
+        print(f"getConfiguredHopLimit exception {e}")
 
 def logMessageToFile(file_name, text_to_append):
     #function to save a string to a file. 
@@ -295,11 +350,21 @@ def messageReplyTo(interface, message):
     send_reply = False
     message_type = "none"
 
-    connection_test_requested = False;
+    #get the hop limit from the message, if not we'll use the configured one
+    global configuredHopLimit
+    hopLimitForOutGoingMessage = configuredHopLimit
+    if "hopLimit" in message:
+        #use 1 more hop than the original message since the path could be asymetric
+        hopLimitForOutGoingMessage = message["hopLimit"] + 1
+        #max hop limit is 7
+        if hopLimitForOutGoingMessage > 7:
+            hopLimitForOutGoingMessage = 7
+
+    connection_test_requested = False
     for t in connection_test_requests:
         if(message_payload.lower()[:len(t)] == t):
-            connection_test_requested = True;
-            break;
+            connection_test_requested = True
+            break
 
     #generic creator of replies for messages
     if (connection_test_requested == True):
@@ -428,9 +493,11 @@ def messageReplyTo(interface, message):
     if send_reply == True:
         conversation_log += f"Sending message to {destination}\n"
         if destination == "!ffffffff":
-            interface.sendText(reply)
+            #print(f"using hoplimit {hopLimitForOutGoingMessage}")
+            mySendText(interface, reply, hopLimit = hopLimitForOutGoingMessage)
         else:
-            interface.sendText(reply, destination)
+            #print(f"using hoplimit {hopLimitForOutGoingMessage}")
+            mySendText(interface, reply, destination, hopLimit = hopLimitForOutGoingMessage)
     else:
         conversation_log += f"Not Sending message to {destination}\n"
 
@@ -681,6 +748,8 @@ def main():
     try:
         interface = meshtastic.tcp_interface.TCPInterface(hostname='localhost')
 
+        getConfiguredHopLimit(interface)
+
         start_time_telemetry = time.time()
         start_time_traceroute = time.time()
 
@@ -728,7 +797,7 @@ def main():
                 mainLoopActive = False
 
     except Exception as e:
-        print("meshtastic.tcp_interface.TCPInterface failed: {e}")
+        print(f"meshtastic.tcp_interface.TCPInterface failed: {e}")
 
 if __name__ == "__main__":
     main()
