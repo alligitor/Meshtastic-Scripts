@@ -295,8 +295,14 @@ def messageReplyTo(interface, message):
     send_reply = False
     message_type = "none"
 
+    connection_test_requested = False;
+    for t in connection_test_requests:
+        if(message_payload.lower()[:len(t)] == t):
+            connection_test_requested = True;
+            break;
+
     #generic creator of replies for messages
-    if (message_payload.lower() in connection_test_requests):
+    if (connection_test_requested == True):
         #someone reqeusted a test
         reply = "Ack from SW 01803"
         if "pkiEncrypted" in message:
